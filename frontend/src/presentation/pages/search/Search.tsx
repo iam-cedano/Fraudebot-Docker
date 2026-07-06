@@ -1,63 +1,93 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Header from "@presentation/shared/components/Header";
 import Footer from "@presentation/shared/components/Footer";
-import LottieAnimation from "@presentation/shared/components/LottieAnimation";
-import RobotLottieAnimation from "@presentation/assets/robot.lottie";
 import SearchContainer from "@presentation/pages/search/components/SearchContainer";
 import { useDependencies } from "@/presentation/providers/DependencyProvider";
+import ScammerEntity from "@/domain/scammer/entities/scammer.entity";
+import Loader from "@/presentation/pages/search/components/Loader";
+import LookupForm from "@presentation/pages/search/components/LookupForm";
+import Formatter from "@/presentation/shared/utils/formatter";
+import Paragraph from "@/presentation/shared/utils/paragraph";
 
 function Search() {
-    const [searchParams] = useSearchParams();
-    const { searchScammerUseCase } = useDependencies();
-    const query = searchParams.get("q");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [isSearching, setIsSearching] = useState(false);
+  const [query, setQuery] = useState(searchParams.get("q") || "");
+  const [scammers, setScammers] = useState<ScammerEntity[]>([]);
+  const { searchScammerUseCase } = useDependencies();
 
-    useEffect(() => {
-        if (!query || query.trim() === "") {
-            return;
-        }
+  useEffect(() => {
+    if (!query || query.trim() === "") {
+      return;
+    }
 
-        searchScammerUseCase.execute(query).then((data) => {
-            console.log(data);
-        }).catch((error) => {
-            if (error?.name === "AbortError" || error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
-                console.log("Search cancelled");
-                return;
-            }
-            console.error("Search failed", error);
-        });
+    setSearchParams({ q: query.replace(/\s+/g, " ").trim() });
+    setQuery(Formatter.FormatInput(query));
 
-        return () => {
-            searchScammerUseCase.cancel();
-        };
-    }, [query, searchScammerUseCase]);
+    setIsSearching(true);
 
-    return (
-        <>
-        <title>FraudeBot - Buscando</title>
-        
-        <Header />
+    searchScammerUseCase
+      .execute(query)
+      .then((res) => setScammers(res))
+      .finally(() => setIsSearching(false));
 
-        <SearchContainer>
-            
-            <div className="grow flex flex-col items-center justify-center">
-                <div className="flex flex-col items-center gap-8">
-                    <div className="w-64 h-64 bg-gray-50 flex items-center justify-center rounded-lg">
-                        <LottieAnimation src={RobotLottieAnimation} />
-                    </div>
+    return () => {
+      searchScammerUseCase.cancel();
+    };
+  }, []);
 
-                    <p className="text-[#6b7280] text-2xl font-[Nunito] text-center">
-                        Buscando información, espere unos segundos
-                    </p>
-                </div>
-            </div>
+  const handleInputChange = (event: React.InputEvent<HTMLInputElement>) => {
+    const newQuery = Paragraph.RemoveWhitespaces(event.currentTarget.value);
 
-        </SearchContainer>
+    const formattedQuery = Formatter.FormatInput(newQuery);
 
-        <Footer />
+    setSearchParams({ q: newQuery });
+    setQuery(formattedQuery);
+  };
 
-        </>
-);
+  const handleSubmit = async () => {
+    if (!query || query.trim() === "") {
+      setIsSearching(false);
+      setScammers([]);
+
+      return;
+    }
+
+    setIsSearching(true);
+
+    try {
+      const scammers = await searchScammerUseCase.execute(query);
+
+      setScammers(scammers);
+    } catch (error) {
+      console.error("Error searching scammers:", error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  return (
+    <>
+      <title>FraudeBot - Buscando</title>
+
+      <Header />
+
+      <SearchContainer>
+        {isSearching && <Loader />}
+
+        {!isSearching && (
+          <LookupForm
+            onSubmit={handleSubmit}
+            onInputChange={handleInputChange}
+            query={query}
+          />
+        )}
+      </SearchContainer>
+
+      <Footer />
+    </>
+  );
 }
 
 export default Search;
