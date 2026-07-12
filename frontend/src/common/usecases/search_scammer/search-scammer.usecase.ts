@@ -1,5 +1,5 @@
 import environment from "@/common/environment";
-import SearchScammerResponse from "@/common/usecases/searcher/models/search-scammer.response";
+import SearchScammerResponse from "@/common/usecases/search_scammer/models/search-scammer.response";
 import PurifierUtil from "@/common/utils/purifier.util";
 import Http from "@/infrastructure/http/http";
 import RequestCanceler from "@/infrastructure/http/request-canceler";
