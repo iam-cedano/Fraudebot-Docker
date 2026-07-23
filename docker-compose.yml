@@ -1,31 +1,38 @@
 name: fraudebot
 
+x-host-user: &host_user "${FRAUDEBOT_UID:-0}:${FRAUDEBOT_GID:-0}"
+
 services:
   backend:
     build:
       context: .
-      dockerfile: docker/php/Dockerfile
+      dockerfile: php/Dockerfile
     image: laravel-clean-app
     working_dir: /var/www/backend
+    user: *host_user
+    environment:
+      HOME: /tmp
+      COMPOSER_HOME: /tmp/composer
+      COMPOSER_CACHE_DIR: /tmp/composer-cache
     volumes:
-      - ./backend:/var/www/backend
-      - ./docker/php/conf.d/php.ini:/usr/local/etc/php/conf.d/php.ini
-      - ./docker/php/conf.d/opcache.ini:/usr/local/etc/php/conf.d/opcache.ini
+      - ../backend:/var/www/backend
+      - ./php/conf.d/php.ini:/usr/local/etc/php/conf.d/php.ini:ro
+      - ./php/conf.d/opcache.ini:/usr/local/etc/php/conf.d/opcache.ini:ro
     depends_on:
       - db
       - cache
     networks:
       - fraudebot-api-network
     env_file:
-      - ./docker/php/.env.php
+      - ./php/.env.php
 
   web:
     image: nginx:alpine
     ports:
       - "9000:80"
     volumes:
-      - ./backend:/var/www/backend
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ../backend:/var/www/backend:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - fraudebot-network
       - fraudebot-api-network
@@ -35,8 +42,12 @@ services:
   frontend:
     image: node:20-alpine
     working_dir: /app
+    user: *host_user
+    environment:
+      HOME: /tmp
+      NPM_CONFIG_CACHE: /tmp/.npm
     volumes:
-      - ./frontend:/app
+      - ../frontend:/app
     ports:
       - 80:80
     command: sh -c "if [ -f package.json ]; then npm install && npm run dev; else tail -f /dev/null; fi"
@@ -47,12 +58,12 @@ services:
     image: mysql:8.0
     restart: unless-stopped
     env_file:
-      - ./docker/db/.env.db
+      - ./db/.env.db
     ports:
       - 3306:3306
     volumes:
       - fraudebot-db-data:/var/lib/mysql
-      - ./docker/db/my.cnf:/etc/mysql/conf.d/my.cnf
+      - ./db/my.cnf:/etc/mysql/conf.d/my.cnf:ro
     networks:
       - fraudebot-api-network
 
