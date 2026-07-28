@@ -14,24 +14,39 @@ services:
       HOME: /tmp
       COMPOSER_HOME: /tmp/composer
       COMPOSER_CACHE_DIR: /tmp/composer-cache
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:9000
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${MYSQL_DATABASE:-fraudebot}
+      DB_USERNAME: ${MYSQL_USER:-fraudebot}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-fraudebot}
+      REDIS_HOST: cache
+      CACHE_STORE: redis
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
     volumes:
-      - ../backend:/var/www/backend
+      - ../fraudebot-backend:/var/www/backend
       - ./php/conf.d/php.ini:/usr/local/etc/php/conf.d/php.ini:ro
       - ./php/conf.d/opcache.ini:/usr/local/etc/php/conf.d/opcache.ini:ro
+      - ./php/entrypoint.sh:/usr/local/bin/fraudebot-entrypoint:ro
     depends_on:
-      - db
-      - cache
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
     networks:
       - fraudebot-api-network
-    env_file:
-      - ./php/.env.php
+    command: fraudebot-entrypoint
 
   web:
     image: nginx:alpine
     ports:
       - "9000:80"
     volumes:
-      - ../backend:/var/www/backend:ro
+      - ../fraudebot-backend:/var/www/backend:ro
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
       - fraudebot-network
@@ -46,8 +61,10 @@ services:
     environment:
       HOME: /tmp
       NPM_CONFIG_CACHE: /tmp/.npm
+      VITE_API_BASE_URL: /api
+      VITE_API_PROXY_TARGET: http://web
     volumes:
-      - ../frontend:/app
+      - ../fraudebot-frontend:/app
     ports:
       - 80:80
     command: sh -c "if [ -f package.json ]; then npm install && npm run dev; else tail -f /dev/null; fi"
@@ -57,8 +74,11 @@ services:
   db:
     image: mysql:8.0
     restart: unless-stopped
-    env_file:
-      - ./db/.env.db
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-fraudebot}
+      MYSQL_USER: ${MYSQL_USER:-fraudebot}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-fraudebot}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-fraudebot-root}
     ports:
       - 3306:3306
     volumes:
@@ -66,6 +86,11 @@ services:
       - ./db/my.cnf:/etc/mysql/conf.d/my.cnf:ro
     networks:
       - fraudebot-api-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-fraudebot-root}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   cache:
     image: redis:alpine
