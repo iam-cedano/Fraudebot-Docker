@@ -21,3 +21,50 @@ Las principales características son:
 - **Bot de Whatsapp/Telegram**: Muy pronto se tendrá soporte en un bot automatizado para que puedas consultar los datos del vendedor.
 
 *Este proyecto está basado en el proyecto sin anime de lucro [Fraudebot](https://www.facebook.com/estafabotmx) que actualmente se encuentra inactivo.*
+
+## Desarrollo local
+
+Coloca los tres repositorios como directorios hermanos:
+
+```text
+repos/
+├── fraudebot-backend/
+├── fraudebot-docker/
+└── fraudebot-frontend/
+```
+
+Docker Compose instala las dependencias, crea la clave de Laravel y ejecuta las
+migraciones al iniciar. No se requieren archivos de configuración para usar los
+valores locales predeterminados.
+
+```bash
+cd fraudebot-docker
+cp .env.example .env
+
+# Ajusta estos valores al usuario del host para conservar permisos correctos.
+sed -i "s/^FRAUDEBOT_UID=.*/FRAUDEBOT_UID=$(id -u)/" .env
+sed -i "s/^FRAUDEBOT_GID=.*/FRAUDEBOT_GID=$(id -g)/" .env
+
+docker compose up --build
+```
+
+Servicios disponibles:
+
+- Frontend: <http://localhost>
+- API: <http://localhost:9000/api/public>
+- Healthcheck: <http://localhost:9000/api/public/healthcheck>
+- MySQL: `localhost:3306`
+- Redis: `localhost:6379`
+
+El frontend envía las solicitudes `/api` al servicio web de Laravel dentro de
+la red de Compose, por lo que no necesita configuración CORS para desarrollo.
+Las credenciales de MySQL se pueden cambiar en `.env`; consulta
+`.env.example`.
+
+Para detener el stack:
+
+```bash
+docker compose down
+```
+
+Agrega `--volumes` solamente si también quieres eliminar los datos locales.
