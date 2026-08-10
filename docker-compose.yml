@@ -42,12 +42,12 @@ services:
   frontend:
     image: node:20-alpine
     working_dir: /app
-    user: *host_user
     environment:
       HOME: /tmp
       NPM_CONFIG_CACHE: /tmp/.npm
     volumes:
       - ../frontend:/app
+      - fraudebot-frontend-node-modules:/app/node_modules
     ports:
       - 80:80
     command: sh -c "if [ -f package.json ]; then npm install && npm run dev; else tail -f /dev/null; fi"
@@ -87,3 +87,4 @@ networks:
 volumes:
   fraudebot-db-data:
   fraudebot-cache-data:
+  fraudebot-frontend-node-modules:
